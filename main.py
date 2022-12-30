@@ -6,7 +6,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.orm import relationship
 from flask_login import UserMixin, login_user, LoginManager, login_required, current_user, logout_user
-from forms import CreatePostForm
+from forms import CreatePostForm, RegisterForm, LoginForm
 from flask_gravatar import Gravatar
 
 app = Flask(__name__)
@@ -19,6 +19,7 @@ bootstrap = Bootstrap5(app)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///blog.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
+login_manager = LoginManager(app)
 
 
 # CONFIGURE TABLES
@@ -34,7 +35,20 @@ class BlogPost(db.Model):
     img_url = db.Column(db.String(250), nullable=False)
 
 
+class User(db.Model, UserMixin):
+    __tablename__ = "users"
+    id = db.Column(db.Integer, primary_key=True)
+    email = db.Column(db.String(100), unique=True)
+    password = db.Column(db.String(100))
+    name = db.Column(db.String(1000))
+
+
 db.create_all()
+
+
+@login_manager.user_loader
+def load_user(user_id):
+    return User.query.get(int(user_id))
 
 
 @app.route('/')
@@ -43,18 +57,55 @@ def get_all_posts():
     return render_template("index.html", all_posts=posts)
 
 
-@app.route('/register')
+@app.route('/register', methods=["GET", "POST"])
 def register():
-    return render_template("register.html")
+    form = RegisterForm()
+    if form.validate_on_submit():
+
+        saved_user = User.query.filter_by(email=form.email.data).first()
+        if saved_user:
+            flash("You've already signed up with that email, Log in instead")
+            return redirect(url_for("login"))
+
+        secure_password = generate_password_hash(
+            form.password.data,
+            method="pbkdf2:sha256",
+            salt_length=8
+        )
+        new_user = User(
+            email=form.email.data,
+            password=secure_password,
+            name=form.name.data
+        )
+        db.session.add(new_user)
+        db.session.commit()
+        login_user(new_user)
+        return redirect(url_for("get_all_posts"))
+    return render_template("register.html", form=form)
 
 
-@app.route('/login')
+@app.route('/login', methods=["GET", "POST"])
 def login():
-    return render_template("login.html")
+    form = LoginForm()
+    if form.validate_on_submit():
+        email = form.email.data
+        entered_password = form.password.data
+
+        saved_user = db.session.query(User).filter_by(email=email).first()
+        if not saved_user:
+            flash("That email does not exist! Please try again")
+            return redirect(url_for("login"))
+        elif check_password_hash(saved_user.password, entered_password):
+            login_user(saved_user)
+            return redirect(url_for("get_all_posts"))
+        else:
+            flash("The password is incorrect! Please try again")
+    return render_template("login.html", form=form)
 
 
 @app.route('/logout')
 def logout():
+    logout_user()
     return redirect(url_for('get_all_posts'))
 
 
@@ -74,7 +125,7 @@ def contact():
     return render_template("contact.html")
 
 
-@app.route("/new-post")
+@app.route("/new-post", methods=["GET", "POST"])
 def add_new_post():
     form = CreatePostForm()
     if form.validate_on_submit():
@@ -83,7 +134,7 @@ def add_new_post():
             subtitle=form.subtitle.data,
             body=form.body.data,
             img_url=form.img_url.data,
-            author=current_user,
+            author=current_user.name,
             date=date.today().strftime("%B %d, %Y")
         )
         db.session.add(new_post)
@@ -92,7 +143,7 @@ def add_new_post():
     return render_template("make-post.html", form=form)
 
 
-@app.route("/edit-post/<int:post_id>")
+@app.route("/edit-post/<int:post_id>", methods=["GET", "POST"])
 def edit_post(post_id):
     post = BlogPost.query.get(post_id)
     edit_form = CreatePostForm(
@@ -106,7 +157,6 @@ def edit_post(post_id):
         post.title = edit_form.title.data
         post.subtitle = edit_form.subtitle.data
         post.img_url = edit_form.img_url.data
-        post.author = edit_form.author.data
         post.body = edit_form.body.data
         db.session.commit()
         return redirect(url_for("show_post", post_id=post.id))

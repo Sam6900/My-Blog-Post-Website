@@ -9,6 +9,12 @@
     border:1px solid #bbb;
     margin:50px;
 }
+
+.flash {
+    margin: 0 18% 2%;
+    color: red;
+}
+
 .titleBox {
     background-color:#fdfdfd;
     padding:10px;
