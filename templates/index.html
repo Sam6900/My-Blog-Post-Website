@@ -30,19 +30,21 @@
                             {{ post.subtitle }}
                         </h3>
                     </a>
-                    <p class="post-meta">Posted by
-                        <a href="#">{{ post.author }}</a>
-                        on {{ post.date }}
-                        <a class="delete-icon" href="{{ url_for('delete_post', post_id=post.id) }}">✘</a>
+                    {% if current_user.id == 1 %}
+                    <p class="post-meta">
+                        Posted by Sahil Sharma on {{ post.date }}
+                        <a id="delete-icon" href="{{ url_for('delete_post', post_id=post.id) }}">✘</a>
                     </p>
+                    {% endif %}
                 </div>
                 <hr>
             {% endfor %}
-
+            {% if current_user.id == 1 %}
             <!-- New Post -->
             <div class="clearfix">
                 <a class="btn btn-primary float-right" href="{{ url_for('add_new_post') }}">Create New Post</a>
             </div>
+            {% endif %}
         </div>
     </div>
 </div>
