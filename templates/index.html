@@ -30,12 +30,12 @@
                             {{ post.subtitle }}
                         </h3>
                     </a>
-                    {% if current_user.id == 1 %}
                     <p class="post-meta">
-                        Posted by Sahil Sharma on {{ post.date }}
+                        Posted by {{ post.author.name }} on {{ post.date }}
+                        {% if current_user.id == 1 %}
                         <a id="delete-icon" href="{{ url_for('delete_post', post_id=post.id) }}">✘</a>
+                        {% endif %}
                     </p>
-                    {% endif %}
                 </div>
                 <hr>
             {% endfor %}
